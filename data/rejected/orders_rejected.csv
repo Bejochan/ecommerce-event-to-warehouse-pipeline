@@ -1,0 +1,7 @@
+order_id,customer_id,order_ts,product_category,quantity,unit_price,discount_pct,payment_method,status,rejection_reason
+O1031,C026,2026-09-11T09:00:00Z,Books,0,15.0,0.0,card,paid,quantity: Input should be greater than 0
+O1032,C027,2026-09-11T10:00:00Z,Fashion,1,-12.0,0.0,ewallet,paid,unit_price: Input should be greater than or equal to 0
+O1033,C028,2026-09-11T11:00:00Z,Electronics,1,99.0,1.2,card,paid,discount_pct: Input should be less than or equal to 1
+O1034,C029,not-a-date,Home,1,50.0,0.0,transfer,paid,"order_ts: Input should be a valid datetime or date, invalid character in year"
+O1035,C030,2026-09-11T14:00:00Z,Books,2,20.0,0.0,card,pending,"status: Input should be 'paid', 'shipped', 'cancelled' or 'refunded'"
+O1036,,2026-09-11T15:00:00Z,Fashion,1,30.0,0.0,ewallet,paid,customer_id: String should have at least 1 character

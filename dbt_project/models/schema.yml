@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: "Tabel staging untuk transaksi pesanan e-commerce yang telah divalidasi oleh data contract."
+    columns:
+      - name: order_id
+        description: "Primary key unik untuk setiap order transaksi."
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "ID pelanggan pembuat transaksi."
+        tests:
+          - not_null
+      - name: net_sales
+        description: "Nilai penjualan bersih setelah dipotong diskon."
+        tests:
+          - not_null
+
+  - name: dim_customer
+    description: "Dimensi pelanggan."
+    columns:
+      - name: customer_id
+        description: "Primary key identitas pelanggan."
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_product_category
+    description: "Dimensi kategori produk."
+    columns:
+      - name: product_category
+        description: "Nama kategori produk."
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_orders
+    description: "Tabel fakta pesanan (grain: satu baris per pesanan)."
+    columns:
+      - name: order_id
+        description: "Identifier transaksi."
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Foreign key ke dim_customer."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_id
+      - name: product_category
+        description: "Foreign key ke dim_product_category."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_product_category')
+              field: product_category
+
+  - name: mart_daily_sales
+    description: "Data mart penjualan agregat harian per kategori produk dan metode pembayaran."
+    columns:
+      - name: order_date
+        tests:
+          - not_null
+      - name: net_sales
+        tests:
+          - not_null

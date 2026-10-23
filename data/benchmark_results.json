@@ -1,0 +1,10 @@
+{
+  "n_rows": 100000,
+  "dataset_size_mb": 0.64,
+  "pandas_time_ms": 74.17,
+  "polars_eager_time_ms": 13.14,
+  "polars_lazy_time_ms": 6.31,
+  "speedup_polars_lazy_vs_pandas": 11.75,
+  "skew_uniform_time_ms": 1.38,
+  "skew_dominated_time_ms": 2.31
+}
