@@ -23,6 +23,10 @@ Seluruh data melewati gerbang kualitas ketat (**Zero-Trust Data Contract Gate** 
 
 ## 🏗️ Arsitektur Pipeline (End-to-End Topology)
 
+<p align="center">
+  <img src="assets/screenshots/00_architecture_diagram.png" alt="E-Commerce Pipeline Architecture Diagram" width="100%">
+</p>
+
 ```mermaid
 graph TD
     subgraph S1["1. Data Ingestion Layer"]
@@ -89,6 +93,10 @@ graph TD
 
 ## 🛡️ Spesifikasi Data Contract & Audit Trail Karantina
 
+<p align="center">
+  <img src="assets/screenshots/02_data_contract_validation.png" alt="Data Contract Validation Evidence" width="100%">
+</p>
+
 Model kontrak data (`scripts/validate.py`) menerapkan aturan validasi ketat:
 
 | Atribut | Tipe Data | Constraint & Validation Rule |
@@ -115,6 +123,10 @@ Model kontrak data (`scripts/validate.py`) menerapkan aturan validasi ketat:
 ---
 
 ## ⚡ Hasil Benchmark Performa & Uji Data Skew
+
+<p align="center">
+  <img src="assets/screenshots/03_benchmark_performance.png" alt="Polars vs Pandas Benchmark Evidence" width="100%">
+</p>
 
 Pengujian transformasi finansial (`gross_amount` dan `net_amount`) dilakukan pada dataset berskala **100.000 baris**:
 
@@ -160,6 +172,10 @@ Completed successfully: PASS=16 WARN=0 ERROR=0 TOTAL=16 (100% Lolos)
 ---
 
 ## 📊 Hasil Analitika Bisnis (SQL Insights)
+
+<p align="center">
+  <img src="assets/screenshots/04_warehouse_assertions_analytics.png" alt="DuckDB SQL Analytics Evidence" width="100%">
+</p>
 
 Hasil query analitik langsung pada `mart_daily_sales` dan `fct_orders`:
 

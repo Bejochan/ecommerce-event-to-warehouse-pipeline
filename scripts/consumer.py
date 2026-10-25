@@ -1,7 +1,13 @@
+import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
+
+# Add scripts directory to sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from confluent_kafka import Consumer
 from validate import OrderModel
 from pydantic import ValidationError
@@ -9,25 +15,30 @@ import duckdb
 
 
 def main():
-    broker = os.getenv("KAFKA_BROKER", "localhost:9092")
-    topic = os.getenv("KAFKA_TOPIC", "orders")
-    group = os.getenv("KAFKA_GROUP", "orders-group")
+    parser = argparse.ArgumentParser(description="Kafka Streaming Consumer for E-Commerce Orders with Quality Gate")
+    parser.add_argument("--broker", default=os.getenv("KAFKA_BROKER", "localhost:9092"), help="Kafka broker host:port")
+    parser.add_argument("--topic", default=os.getenv("KAFKA_TOPIC", "orders"), help="Kafka topic name")
+    parser.add_argument("--group", default=os.getenv("KAFKA_GROUP", "orders-group"), help="Consumer group ID")
+    parser.add_argument("--max-messages", type=int, default=None, help="Maximum messages to consume before stopping")
+    parser.add_argument("--timeout", type=float, default=1.5, help="Poll timeout in seconds")
+    args = parser.parse_args()
 
     conf = {
-        "bootstrap.servers": broker,
-        "group.id": group,
+        "bootstrap.servers": args.broker,
+        "group.id": args.group,
         "auto.offset.reset": "earliest",
         "enable.auto.commit": False,
     }
 
     consumer = Consumer(conf)
-    consumer.subscribe([topic])
-    print(f"[CONSUMER] Berlangganan topic '{topic}' dengan Consumer Group '{group}'...")
+    consumer.subscribe([args.topic])
+    print(f"[CONSUMER] Berlangganan topic '{args.topic}' dengan Consumer Group '{args.group}'...")
 
-    db_path = Path(__file__).parent.parent / "warehouse" / "warehouse.duckdb"
+    db_path = Path(__file__).resolve().parent.parent / "warehouse" / "warehouse.duckdb"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = duckdb.connect(str(db_path))
 
-    # Pastikan tabel streaming_events ada
+    # Pastikan tabel streaming_orders ada
     conn.execute("""
         CREATE TABLE IF NOT EXISTS streaming_orders (
             order_id VARCHAR PRIMARY KEY,
@@ -44,18 +55,19 @@ def main():
         );
     """)
 
-    rejected_path = Path(__file__).parent.parent / "data" / "rejected" / "stream_rejected.csv"
+    rejected_path = Path(__file__).resolve().parent.parent / "data" / "rejected" / "stream_rejected.csv"
     rejected_path.parent.mkdir(parents=True, exist_ok=True)
 
     count_valid = 0
     count_rejected = 0
+    total_processed = 0
 
     try:
         while True:
-            msg = consumer.poll(1.5)
+            msg = consumer.poll(args.timeout)
             if msg is None:
                 # Idle break for batch demo
-                print("[CONSUMER] Menunggu pesan streaming baru (timeout 1.5s)...")
+                print(f"[CONSUMER] Menunggu pesan streaming baru (timeout {args.timeout}s)...")
                 time.sleep(1.0)
                 continue
             if msg.error():
@@ -64,6 +76,7 @@ def main():
 
             raw_val = msg.value().decode("utf-8")
             event = json.loads(raw_val)
+            total_processed += 1
 
             # Validasi Data Contract
             try:
@@ -95,8 +108,12 @@ def main():
             # Manual commit offset (At-least-once delivery)
             consumer.commit(message=msg, asynchronous=False)
 
+            if args.max_messages and total_processed >= args.max_messages:
+                print(f"[CONSUMER] Mencapai batas maksimum pesan ({args.max_messages}). Selesai.")
+                break
+
     except KeyboardInterrupt:
-        print(f"\n[CONSUMER] Dihentikan. Total Valid: {count_valid}, Total Rejected: {count_rejected}")
+        print(f"\n[CONSUMER] Dihentikan oleh user. Total Valid: {count_valid}, Total Rejected: {count_rejected}")
     finally:
         consumer.close()
         conn.close()
