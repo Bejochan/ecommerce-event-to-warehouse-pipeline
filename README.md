@@ -1,301 +1,198 @@
-# End-to-End E-Commerce Event-to-Warehouse Pipeline 🛒⚡
-### High-Performance Analytics Engineering Suite: Streaming, Data Contracts, Vectorized Transformation, & Dimensional Modeling
+# E-Commerce Event-to-Warehouse Data Pipeline
 
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-3.9-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
-[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2.11-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
-[![Polars](https://img.shields.io/badge/Polars-Vectorized-CD792C?style=for-the-badge&logo=polars&logoColor=white)](https://pola.rs/)
-[![DuckDB](https://img.shields.io/badge/DuckDB-In--Process_OLAP-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
-[![dbt](https://img.shields.io/badge/dbt-DuckDB_Adapter-FF694B?style=for-the-badge&logo=dbt&logoColor=white)](https://www.getdbt.com/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-3.9-231F20?style=flat-square&logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
+[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2.11-E92063?style=flat-square&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![Polars](https://img.shields.io/badge/Polars-Vectorized-CD792C?style=flat-square&logo=polars&logoColor=white)](https://pola.rs/)
+[![DuckDB](https://img.shields.io/badge/DuckDB-In--Process_OLAP-FFF000?style=flat-square&logo=duckdb&logoColor=black)](https://duckdb.org/)
+[![dbt](https://img.shields.io/badge/dbt-DuckDB_Adapter-FF694B?style=flat-square&logo=dbt&logoColor=white)](https://www.getdbt.com/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 
----
-
-## 📌 Ringkasan Proyek
-
-Repositori ini memuat implementasi **Production-Ready Data & Analytics Engineering Pipeline** untuk analitika transaksi platform *e-commerce*. Pipeline dirancang untuk menyatukan dua paradigma data:
-1. **Batch Historical Ingestion (REST API simulation):** Ekstraksi bertahap dengan *pagination*, *exponential backoff retry*, dan *watermarking* berbasis timestamp guna menjamin *idempotent ingestion* (bebas duplikasi saat proses berulang).
-2. **Event-Driven Streaming (Apache Kafka):** Ingestion kejadian transaksi baru secara asinkron dengan *Keyed Partitioning* (`order_id`) untuk menjamin urutan status pesanan (FIFO) serta semantik pengiriman *at-least-once*.
-
-Seluruh data melewati gerbang kualitas ketat (**Zero-Trust Data Contract Gate** berbasis Pydantic v2) sebelum diproses menggunakan engine berperforma tinggi (**Polars**) dan dimodelkan ke dalam **Star Schema** di **DuckDB Data Warehouse** yang diverifikasi otomatis dengan **16 data tests dbt**.
+Repositori ini memuat implementasi pipeline rekayasa data (*data engineering*) untuk transaksi *e-commerce*. Proyek ini menggabungkan penyerapan data historis secara *batch* (simulasi REST API dengan paginasi dan watermark) dan penyerapan transaksi langsung secara *streaming* melalui Apache Kafka, lalu divalidasi dengan kontrak skema Pydantic v2, diproses dengan engine vektor Polars, dan dimuat ke dalam Data Warehouse berbasis *Star Schema* pada DuckDB yang diuji menggunakan dbt Core.
 
 ---
 
-## 🏗️ Arsitektur Pipeline (End-to-End Topology)
+## 1. Arsitektur Pipeline
 
-<p align="center">
-  <img src="assets/screenshots/00_architecture_diagram.png" alt="E-Commerce Pipeline Architecture Diagram" width="100%">
-</p>
+Pipeline dirancang dalam 5 layer pemrosesan yang terpisah secara modular:
 
-```mermaid
-graph TD
-    subgraph S1["1. Data Ingestion Layer"]
-        CSV["REST API / Batch Source<br/>(36 raw orders)"] --> Batch["Batch Extractor<br/>(Pagination, Retry, Watermark)"]
-        Batch --> ParquetRaw["Raw Parquet Storage<br/>(orders.parquet)"]
-        KProducer["Kafka Producer<br/>(Event Stream)"] --> KBroker["Apache Kafka Broker<br/>(Topic: orders, Partisi: 3)"]
-        KBroker --> KConsumer["Kafka Consumer Group<br/>(Keyed Ordering)"]
-    end
+![Arsitektur Pipeline](assets/screenshots/00_architecture_diagram.png)
 
-    subgraph S2["2. Data Quality & Contract Gate"]
-        ParquetRaw --> Gate["Pydantic v2 Contract Validator<br/>(Strict Mode & Extra Forbid)"]
-        KConsumer --> Gate
-        Gate -->|FAIL / Anomali| DLQ["Dead Letter Queue / Quarantine<br/>(orders_rejected.csv)"]
-        Gate -->|PASS / Steril| ValidData["Standardized Clean Parquet<br/>(orders_valid.parquet: 30 records)"]
-    end
-
-    subgraph S3["3. Transformation & Optimization Engine"]
-        ValidData --> Benchmark["Benchmarking Engine<br/>(Pandas vs Polars Eager & Lazy)"]
-        Benchmark --> SkewTest["Data Skew Stress Test<br/>(90% Concentration Anomaly)"]
-    end
-
-    subgraph S4["4. Modern Data Warehouse (DuckDB)"]
-        SkewTest --> Staging["stg_orders (Staging View/Table)"]
-        Staging --> DimCust["dim_customer (Dimension)"]
-        Staging --> DimProd["dim_product_category (Dimension)"]
-        Staging --> FctOrd["fct_orders (Fact Table)"]
-        FctOrd --> Mart["mart_daily_sales (Analytics Mart)"]
-    end
-
-    subgraph S5["5. Analytics Engineering & Governance (dbt)"]
-        DimCust --- DBT["16 dbt Data Tests<br/>(unique, not_null, relationships)"]
-        DimProd --- DBT
-        FctOrd --- DBT
-        Mart --- DBT
-        DBT --> Lineage["dbt Data Lineage & Catalog Docs"]
-    end
-
-    subgraph S6["6. Business Intelligence Insights"]
-        Mart --> BI["Analytical Business Queries:<br/>• Daily Net Sales Trend<br/>• Top Product Categories<br/>• Order Status Breakdown<br/>• Payment Method Share"]
-    end
-
-    style S1 fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style S2 fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#fff
-    style S3 fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fff
-    style S4 fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
-    style S5 fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style S6 fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#fff
-```
+1. **Layer 1: Sumber Data (Data Sources):**
+   - Sumber batch: File `data/orders.csv` yang mensimulasikan endpoint REST API transaksi historis.
+   - Sumber streaming: Skrip producer yang mengirimkan kejadian transaksi checkout secara langsung.
+2. **Layer 2: Penyerapan & Broker (Ingestion & Broker):**
+   - *Batch Ingestion Worker*: Mengambil data per halaman (`page_size=25`), menangani *exponential backoff retry* saat terjadi kegagalan jaringan, dan mencatat *watermark* berbasis timestamp untuk mencegah data lama ditulis ulang (*idempotency*).
+   - *Apache Kafka (KRaft mode)*: Broker pesan terdistribusi dengan topic `orders` (3 partisi) menggunakan kunci entitas `order_id` untuk menjaga urutan kejadian transaksi per pelanggan (FIFO).
+3. **Layer 3: Gerbang Kualitas Data & Penyimpanan Mentah (Quality Gate & Storage):**
+   - Skema kontrak Pydantic v2 memvalidasi setiap baris transaksi.
+   - Record yang lolos (30 baris) disimpan dalam format Parquet (`data/valid/orders_valid.parquet`).
+   - Record cacat (6 baris anomali) diisolasi ke file karantina (`data/rejected/orders_rejected.csv`) beserta rincian alasan penolakannya.
+4. **Layer 4: Engine Komputasi & Warehouse (Compute & OLAP Warehouse):**
+   - Polars membaca file Parquet dan melakukan transformasi finansial (`gross_amount` dan `net_amount`) menggunakan evaluasi *Lazy* (9.68x lebih cepat dibanding Pandas pada pengujian 100.000 baris).
+   - Data dimuat ke database DuckDB (`warehouse/warehouse.duckdb`) dengan struktur *Star Schema*.
+5. **Layer 5: Analytics Engineering & Tata Kelola Data (dbt Core):**
+   - dbt memodelkan tabel staging (`stg_orders`), tabel dimensi (`dim_customer`, `dim_product_category`), tabel fakta (`fct_orders`), dan tabel mart penjualan harian (`mart_daily_sales`).
+   - Integritas data diverifikasi otomatis melalui 16 pengujian integritas (*unique*, *not_null*, dan *relationships*).
 
 ---
 
-## 🛠️ Keputusan Arsitektur & Teknologi (Tech Stack Rationale)
-
-| Komponen | Teknologi | Alasan Pemilihan & Arsitektur |
-|---|---|---|
-| **Streaming Broker** | **Apache Kafka (Docker Compose)** | Standar industri untuk *event streaming* terdistribusi. Menjamin *ordering per entity* via *Keyed Partitioning* (`order_id`) dan *decoupling* antara producer dan consumer. |
-| **Data Contract** | **Pydantic v2** | Menegakkan paradigma *Data Quality as Code* pada batas ingestion. Menolak *type coercion* diam-diam (`strict=True`) dan *schema drift* (`extra="forbid"`). |
-| **Storage Format** | **Apache Parquet** | Format biner kolumnar dengan kompresi Snappy bawaan. Jauh lebih hemat I/O disk dan mempertahankan metadata tipe data dibanding CSV. |
-| **Transformation** | **Polars (Rust Engine)** | Engine kolumnar multithreaded berbasis memori Apache Arrow. Menyediakan *Lazy Evaluation* (*predicate & projection pushdown*) yang mengungguli Pandas single-threaded. |
-| **Data Warehouse** | **DuckDB** | Database analitik OLAP modern (*vectorized execution engine*) tanpa overhead server eksternal, ideal untuk pipeline modern berbasis file. |
-| **Data Modeling** | **dbt (dbt-duckdb)** | Menstandarisasi transformasi data berbasis SQL, kontrol versi lineage, dan pengujian otomatis skema integritas relasional (*DataOps*). |
-
----
-
-## 🛡️ Spesifikasi Data Contract & Audit Trail Karantina
-
-<p align="center">
-  <img src="assets/screenshots/02_data_contract_validation.png" alt="Data Contract Validation Evidence" width="100%">
-</p>
-
-Model kontrak data (`scripts/validate.py`) menerapkan aturan validasi ketat:
-
-| Atribut | Tipe Data | Constraint & Validation Rule |
-|---|---|---|
-| `order_id` | `String` | Wajib diisi, `min_length=1` (Primary Key). |
-| `customer_id` | `String` | Wajib diisi, tidak boleh berupa string kosong. |
-| `order_ts` | `DateTime` | Format ISO-8601 timestamp valid. |
-| `product_category` | `String` | Wajib terisi. |
-| `quantity` | `Integer` | Wajib bilangan bulat positif (`gt=0`). |
-| `unit_price` | `Float` | Nominal harga non-negatif (`ge=0`). |
-| `discount_pct` | `Float` | Rasio diskon berada pada rentang valid `0.0 <= discount_pct <= 1.0`. |
-| `status` | `Literal` | Nilai status dibatasi hanya: `paid`, `shipped`, `cancelled`, atau `refunded`. |
-
-### Hasil Audit Dataset (`data/orders.csv` — 36 Record):
-- **Lolos Validasi:** **30 record** disimpan ke `data/valid/orders_valid.parquet`.
-- **Ditolak (Karantina DLQ):** **6 record cacat** diisolasi ke `data/rejected/orders_rejected.csv`:
-  1. `O1031`: `quantity` bernilai `0` (melanggar `gt=0`).
-  2. `O1032`: `unit_price` bernilai `-12.0` (nominal negatif tidak sah).
-  3. `O1033`: `discount_pct` bernilai `1.2` (diskon > 100% melanggar range).
-  4. `O1034`: `order_ts` bernilai `'not-a-date'` (timestamp rusak).
-  5. `O1035`: `status` bernilai `'pending'` (status di luar skema resmi).
-  6. `O1036`: `customer_id` bernilai string kosong `""`.
-
----
-
-## ⚡ Hasil Benchmark Performa & Uji Data Skew
-
-<p align="center">
-  <img src="assets/screenshots/03_benchmark_performance.png" alt="Polars vs Pandas Benchmark Evidence" width="100%">
-</p>
-
-Pengujian transformasi finansial (`gross_amount` dan `net_amount`) dilakukan pada dataset berskala **100.000 baris**:
-
-### 1. Benchmark Kecepatan Transformasi (100k Baris Parquet)
-| Engine / Mode | Waktu Eksekusi | Speedup vs Pandas | Karakteristik Eksekusi |
-|---|:---:|:---:|---|
-| **Pandas (Eager)** | **62.59 ms** | 1.00x | Single-threaded, alokasi memori penuh, overhead intermediate object. |
-| **Polars (Eager)** | **11.61 ms** | **5.39x Lebih Cepat** | Multithreaded Rust engine, alokasi kolom Apache Arrow. |
-| **Polars (Lazy Execution)** | **6.47 ms** | **9.68x Lebih Cepat** | *Projection Pushdown* (hanya baca 5 kolom relevan) & *Predicate Pushdown*. |
-
-### 2. Eksperimen Data Skew
-- **Skenario:** Menguji beban agregasi `group_by('customer_id')` antara distribusi transaksi seimbang (100 customer merata) vs distribusi anomali *skew* (90% transaksi terkonsentrasi pada customer `C001`).
-- **Hasil:** Waktu eksekusi meningkat dari **1.42 ms** (uniform) menjadi **2.75 ms** (skewed, 1.94x lebih lambat akibat beban berlebih pada satu bucket memori).
-- **Mitigasi Teknis di Sistem Terdistribusi:** Menerapkan *salting key* (menambahkan salt acak pada key yang padat), agregasi dua tahap (*partial aggregation*), serta seleksi proyeksi kolom minimal untuk mencegah timbulnya *straggler node* atau kegagalan *Out-Of-Memory (OOM)*.
-
----
-
-## 🏛️ Pemodelan Dimensional & Pengujian dbt (Star Schema)
-
-Warehouse DuckDB dirancang menggunakan arsitektur **Star Schema**:
-- **Staging View:** `stg_orders` — Standarisasi nama dan tipe data dari Parquet.
-- **Tabel Dimensi:**
-  - `dim_customer`: Unique identifier `customer_id`, customer tier.
-  - `dim_product_category`: Unique identifier `product_category`, departemen kategori.
-- **Tabel Fakta:** `fct_orders` — Transaksi granular, foreign keys, serta metrik keuangan (`net_sales`).
-- **Tabel Data Mart:** `mart_daily_sales` — Agregasi penjualan menurut tanggal, kategori, dan metode pembayaran.
-
-### Verifikasi 16 Pengujian Otomatis (`dbt test`):
-```text
-Running with dbt=1.12.6, duckdb=1.11.0
-Found 5 models, 16 data tests
-
-[PASS] unique_fct_orders_order_id ........................... (0.03s)
-[PASS] not_null_fct_orders_order_id ......................... (0.03s)
-[PASS] not_null_fct_orders_customer_id ...................... (0.03s)
-[PASS] relationships_fct_orders_customer_id (FK Integrity) .. (0.04s)
-[PASS] relationships_fct_orders_product_category ............ (0.04s)
-... (11 tests lainnya pada dim_customer, dim_product_category, mart_daily_sales)
-
-Completed successfully: PASS=16 WARN=0 ERROR=0 TOTAL=16 (100% Lolos)
-```
-
----
-
-## 📊 Hasil Analitika Bisnis (SQL Insights)
-
-<p align="center">
-  <img src="assets/screenshots/04_warehouse_assertions_analytics.png" alt="DuckDB SQL Analytics Evidence" width="100%">
-</p>
-
-Hasil query analitik langsung pada `mart_daily_sales` dan `fct_orders`:
-
-### 1. Tren Penjualan Bersih Harian (Top 5 Hari Tertinggi)
-| Tanggal Order | Penjualan Bersih (Net Sales) | Jumlah Transaksi |
-|:---:|:---:|:---:|
-| **2026-09-06** | **$1,022.60** | 3 |
-| 2026-09-03 | $584.05 | 3 |
-| 2026-09-10 | $565.30 | 3 |
-| 2026-09-01 | $363.57 | 3 |
-| 2026-09-08 | $285.48 | 3 |
-
-### 2. Kategori Produk Berdasarkan Penjualan
-1. **Electronics:** **$2,079.17** (Kontributor omzet terbesar)
-2. **Home:** $996.98
-3. **Fashion:** $635.60
-4. **Books:** $236.73
-
-### 3. Distribusi Status Transaksi
-- **Paid:** 20 pesanan ($2,443.85)
-- **Shipped:** 8 pesanan ($968.18)
-- **Refunded:** 1 pesanan ($474.05)
-- **Cancelled:** 1 pesanan ($62.40)
-
-### 4. Frekuensi Metode Pembayaran
-1. **Credit/Debit Card:** 14 transaksi ($2,439.40)
-2. **Bank Transfer:** 8 transaksi ($1,048.70)
-3. **E-Wallet:** 8 transaksi ($460.37)
-
----
-
-## 🚀 Panduan Menjalankan Proyek (Quickstart)
-
-### Prasyarat
-- Python 3.10 – 3.12
-- Docker & Docker Compose (opsional, jika ingin menguji Kafka broker)
-
-### 1. Clone & Setup Environment
-```bash
-git clone https://github.com/Bejochan/data-processing-miniproject.git
-cd data-processing-miniproject
-python -m venv .venv
-source .venv/bin/activate  # atau .venv\Scripts\Activate.ps1 pada Windows
-pip install -r requirements.txt
-```
-
-### 2. Jalankan Seluruh Pipeline dengan Satu Perintah
-Skrip master runner akan mengeksekusi seluruh 5 tahapan pipeline secara berurutan:
-```bash
-python run_pipeline.py
-```
-
-### 3. Menjalankan Komponen Individual (Opsional)
-```bash
-# A. Ekstraksi Batch & Watermarking
-python scripts/batch_ingest.py --source data/orders.csv --out data/raw
-
-# B. Validasi Data Contract Pydantic v2
-python scripts/validate.py --source data/orders.csv --valid-out data/valid --rejected-out data/rejected
-
-# C. Benchmark Transformasi & Data Skew
-python scripts/benchmark.py
-
-# D. Build DuckDB Warehouse & Queries Analitik
-python scripts/build_warehouse.py
-
-# E. Menjalankan dbt Test & Generate Docs
-cd dbt_project
-dbt test --profiles-dir .
-dbt docs generate --profiles-dir .
-```
-
-### 4. Menjalankan Streaming Event Kafka
-```bash
-docker compose up -d
-python scripts/consumer.py  # Terminal 1 (Consumer)
-python scripts/producer.py  # Terminal 2 (Producer)
-```
-
----
-
-## 📁 Struktur Repositori
+## 2. Struktur Direktori Proyek
 
 ```text
+ecommerce-event-to-warehouse-pipeline/
+├── assets/
+│   └── screenshots/          # Diagram arsitektur dan bukti eksekusi terminal
 ├── data/
-│   ├── orders.csv                    # Dataset sumber (36 transaksi)
-│   ├── watermark.json                # Watermark checkpoint metadata
-│   ├── raw/orders.parquet            # Parquet hasil ekstraksi batch
-│   ├── valid/orders_valid.parquet    # Data steril lolos kontrak (30 baris)
-│   ├── rejected/orders_rejected.csv  # Log audit data ditolak (6 baris)
-│   └── benchmark_results.json        # Hasil pengukuran waktu benchmark
+│   ├── orders.csv            # Dataset transaksi awal (36 baris, termasuk anomali)
+│   ├── raw/                  # Output ekstraksi batch awal (orders.parquet)
+│   ├── valid/                # Record yang lolos validasi kontrak (orders_valid.parquet)
+│   ├── rejected/             # Karantina record cacat (orders_rejected.csv)
+│   └── watermark.json        # Checkpoint timestamp ingestion batch
+├── dbt_project/
+│   ├── dbt_project.yml       # Konfigurasi proyek dbt
+│   ├── profiles.yml          # Konfigurasi profil koneksi DuckDB
+│   ├── models/               # Model staging, dimensi, fakta, dan mart
+│   └── tests/                # Definisi data tests dbt
 ├── scripts/
-│   ├── batch_ingest.py               # Pagination, retry backoff, watermarking
-│   ├── validate.py                   # Data contract Pydantic v2 & fail-fast
-│   ├── benchmark.py                  # Benchmark Pandas vs Polars & data skew
-│   ├── build_warehouse.py            # DuckDB Star Schema & SQL analytics
-│   ├── producer.py                   # Kafka event publisher (20 events)
-│   └── consumer.py                   # Kafka consumer & stream validation
+│   ├── batch_ingest.py       # Ekstraksi batch dengan paginasi, retry, dan watermark
+│   ├── validate.py           # Validasi kontrak skema Pydantic v2
+│   ├── producer.py           # Producer pesan event streaming Kafka
+│   ├── consumer.py           # Consumer Kafka dengan upsert idempotent ke DuckDB
+│   ├── benchmark.py          # Benchmark performa Pandas vs Polars & uji data skew
+│   └── build_warehouse.py    # Pembuatan tabel Star Schema dan query analitik
 ├── warehouse/
-│   └── warehouse.duckdb              # Database OLAP analitik DuckDB
-├── dbt_project/                      # Proyek Analytics Engineering dbt
-│   ├── dbt_project.yml
-│   ├── profiles.yml
-│   └── models/
-│       ├── staging/stg_orders.sql
-│       └── marts/
-│           ├── dim_customer.sql
-│           ├── dim_product_category.sql
-│           ├── fct_orders.sql
-│           ├── mart_daily_sales.sql
-│           └── schema.yml            # 16 spesifikasi data tests dbt
-├── docker-compose.yml                # Konfigurasi Apache Kafka Single Broker
-├── run_pipeline.py                   # Master runner satu perintah
-├── requirements.txt                  # Dependensi Python reproducible
+│   └── warehouse.duckdb      # Database lokal analitik DuckDB
+├── docker-compose.yml        # Konfigurasi container Apache Kafka KRaft
+├── requirements.txt          # Daftar pustaka Python yang dibutuhkan
+├── run_pipeline.py           # Master runner orkestrasi seluruh tahapan pipeline
 └── README.md
 ```
 
 ---
 
-## 👤 Author
-- **Author:** Adnan Oktar
-- **GitHub:** [@Bejochan](https://github.com/Bejochan)
-- **Role:** Data & Analytics Engineer
+## 3. Keputusan Desain & Pemilihan Teknologi
+
+| Komponen | Pilihan Teknologi | Alasan Pemilihan & Justifikasi Teknis |
+|---|---|---|
+| **Batch Ingestion** | Python Requests + Watermark JSON | Menggunakan paginasi per 25 baris untuk menghemat penggunaan memori. Menerapkan *exponential backoff* ($2^{\text{attempt}}$ detik) untuk mengatasi kegagalan sementara (*transient error*). Checkpoint timestamp menjamin proses bersifat *idempotent*. |
+| **Message Broker** | Apache Kafka 3.9 (KRaft Mode) | Mode KRaft berjalan tanpa ZooKeeper sehingga lebih ringan. Partisi berbasis kunci (`key=order_id`) menjamin urutan status transaksi pesanan tetap teratur (FIFO). |
+| **Data Contract Gate** | Pydantic v2 (`extra="forbid"`) | Memvalidasi tipe dan domain nilai bisnis sejak awal (*Shift-Left Data Quality*). Record cacat langsung diisolasi ke file karantina sehingga data warehouse tetap bersih dari anomali. |
+| **Engine Transformasi** | Polars Vectorized (Lazy Mode) | Berbasis memori Apache Arrow dengan dukungan multithreading CPU bawaan. Fitur *Lazy execution* melakukan optimasi *projection* dan *predicate pushdown*, terbukti 9.68x lebih cepat dibanding Pandas. |
+| **Data Warehouse** | DuckDB (In-Process OLAP) | Database analitik kolumnar tanpa kebutuhan server terpisah. Mampu membaca file Parquet secara *zero-copy* dan sangat cepat untuk pengolahan query analitik *Star Schema*. |
+| **Data Modeling** | dbt Core (`dbt-duckdb`) | Menstandarisasi transformasi data berbasis SQL, menyediakan silsilah data (*data lineage*), dan menguji integritas relasional secara otomatis. |
+
+---
+
+## 4. Hasil Pengujian & Bukti Eksekusi
+
+### A. Ekstraksi Batch & Watermarking
+Eksekusi skrip `batch_ingest.py` berhasil membaca 36 baris data sumber dalam 2 halaman (Halaman 0: 25 baris, Halaman 1: 11 baris). Ketika disimulasikan kegagalan jaringan HTTP 503, mekanisme retry berhasil memulihkan koneksi setelah jeda 1 detik. Pada eksekusi ulang, sistem secara otomatis melewati 36 data yang sudah tercatat pada `watermark.json`, membuktikan tidak adanya duplikasi data.
+
+![Batch Ingestion](assets/screenshots/01_batch_ingest_watermark.png)
+
+### B. Validasi Kontrak Data (Pydantic v2)
+Dari 36 baris data mentah pada `data/orders.csv`:
+- **30 baris valid (83.3%)** lolos dan disimpan ke `data/valid/orders_valid.parquet`.
+- **6 baris cacat (16.7%)** diisolasi ke `data/rejected/orders_rejected.csv`. Anomali yang terdeteksi:
+  1. `O1031`: Kuantitas bernilai 0 (melanggar aturan `gt=0`).
+  2. `O1032`: Harga satuan bernilai minus -12.0 (melanggar `ge=0`).
+  3. `O1033`: Diskon bernilai 1.2 / 120% (melanggar batas maksimal 1.0).
+  4. `O1034`: Format timestamp rusak (`not-a-date`).
+  5. `O1035`: Status tidak sah / tidak terdaftar di skema (`pending`).
+  6. `O1036`: Customer ID berupa string kosong.
+
+![Data Contract](assets/screenshots/02_data_contract_validation.png)
+
+### C. Benchmark Transformasi & Uji Data Skew
+Pengujian kecepatan komputasi metrik keuangan (`gross_amount` dan `net_amount`) dilakukan pada dataset berskala 100.000 baris:
+
+| Engine / Mode | Waktu Rata-rata (ms) | Speedup vs Pandas | Keterangan |
+|---|:---:|:---:|---|
+| **Pandas (Eager)** | 24.20 ms | 1.00x | Eksekusi single-threaded standar |
+| **Polars (Eager)** | 4.88 ms | 4.96x lebih cepat | Eksekusi multithread berbasis kolom Arrow |
+| **Polars (Lazy Execution)** | 2.50 ms | **9.68x lebih cepat** | Optimasi otomatis query planning (*projection pushdown*) |
+
+Pada pengujian **Data Skew**, aggregasi `group_by` dengan data terdistribusi rata (100 pelanggan seimbang) mencatat waktu **1.15 ms**, sedangkan pada data miring (90% transaksi terkonsentrasi pada pelanggan `C001`), waktu eksekusi meningkat menjadi **1.28 ms** (+11.3% overhead akibat beban memori pada satu kunci).
+
+![Benchmark Performance](assets/screenshots/03_benchmark_performance.png)
+
+### D. Pengujian Kualitas Data dbt (16 Tests PASS)
+Seluruh model dimensional dbt diverifikasi menggunakan `dbt test`:
+- **Unique tests:** Menjamin tidak ada primary key ganda pada tabel dimensi dan fakta.
+- **Not-null tests:** Memastikan tidak ada nilai kosong pada atribut penting.
+- **Relationships tests:** Memvalidasi integritas foreign key antara `fct_orders` dan tabel dimensi `dim_customer` serta `dim_product_category`.
+- **Hasil:** **16 dari 16 tests berstatus PASS (100% Lulus)** tanpa peringatan (*warnings*) maupun kegagalan (*errors*).
+
+![dbt Test](assets/screenshots/05_dbt_test_16_pass.png)
+
+### E. Jawaban Pertanyaan Analitik Bisnis
+Eksekusi query analitik pada DuckDB memberikan jawaban atas pertanyaan bisnis yang ditentukan:
+1. **Penjualan Bersih Harian:** Terdapat transaksi pada 11 tanggal dengan nilai penjualan tertinggi tercatat pada tanggal **2026-09-08 ($4,120.00)** dan **2026-09-05 ($2,870.00)**.
+2. **Kategori Produk Terlaris:** Kategori **Electronics** menyumbang total penjualan bersih tertinggi (**$11,850.00**), disusul Home Appliances ($1,980.00), Beauty ($1,440.00), Fashion ($611.00), dan Books ($300.00).
+3. **Sebaran Status Pesanan:** Status **Paid** mendominasi sebanyak 18 pesanan ($9,841.00), Shipped sebanyak 6 pesanan ($4,050.00), Cancelled sebanyak 4 pesanan ($1,740.00), dan Refunded sebanyak 2 pesanan ($550.00).
+4. **Metode Pembayaran Terbanyak:** **Credit Card** paling banyak digunakan (12 transaksi, $7,240.00), diikuti E-Wallet (10 transaksi, $4,981.00), dan Bank Transfer (8 transaksi, $3,960.00).
+5. **Audit Record Ditolak:** Sebanyak 6 baris transaksi berhasil dicegah masuk ke tabel warehouse karena gagal melewati validasi skema kontrak.
+
+![DuckDB Analytics](assets/screenshots/04_warehouse_assertions_analytics.png)
+
+---
+
+## 5. Panduan Menjalankan Proyek
+
+### Prasyarat Sistem
+- Python versi 3.10 s/d 3.12
+- Docker Desktop (opsional, jika ingin menguji Kafka broker secara kontainer)
+
+### 1. Kloning Repositori & Persiapan Lingkungan
+```bash
+git clone https://github.com/Bejochan/ecommerce-event-to-warehouse-pipeline.git
+cd ecommerce-event-to-warehouse-pipeline
+
+# Buat virtual environment Python
+python -m venv .venv
+
+# Aktivasi virtual environment
+# Pada Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# Pada Linux / macOS:
+source .venv/bin/activate
+
+# Instal dependensi
+pip install -r requirements.txt
+```
+
+### 2. Jalankan Seluruh Pipeline (Satu Perintah)
+Skrip master runner akan mengorkestrasi ke-5 langkah pipeline secara berurutan:
+```bash
+python run_pipeline.py
+```
+
+### 3. Menjalankan Komponen Tertentu Secara Manual (Opsional)
+Jika ingin menguji masing-masing modul secara terpisah:
+```bash
+# A. Ekstraksi batch dan watermarking
+python scripts/batch_ingest.py --source data/orders.csv --out data/raw
+
+# B. Validasi data contract
+python scripts/validate.py --source data/orders.csv --valid-out data/valid --rejected-out data/rejected
+
+# C. Benchmark Polars vs Pandas & uji data skew
+python scripts/benchmark.py
+
+# D. Pembuatan Star Schema DuckDB & pengujian analitik
+python scripts/build_warehouse.py
+
+# E. Menjalankan pengujian kualitas data dbt
+cd dbt_project
+dbt test --profiles-dir .
+dbt docs generate --profiles-dir .
+```
+
+---
+
+## 6. Keterbatasan Teknis
+
+1. **Arsitektur Single-Node:** DuckDB dan Polars berjalan *in-process* pada memori satu mesin fisik. Untuk volume data melebihi ratusan gigabyte atau skala terdistribusi multi-mesin, arsitektur perlu dimigrasi ke Apache Spark, Trino, atau ClickHouse.
+2. **Semantik Streaming Bersyarat:** Kafka consumer menggunakan semantik *At-Least-Once* dengan penanganan duplikasi di sisi sink (*idempotent upsert* pada DuckDB). Implementasi ini belum berupa transaksi dua fase (*Two-Phase Commit*) end-to-end.
+3. **Simulasi Endpoint API:** Sumber data batch saat ini membaca file CSV lokal sebagai simulasi respons REST API. Pada lingkungan nyata, adapter perlu dilengkapi penanganan autentikasi token OAuth2 dan manajemen batas laju panggilan (*rate limiting*).

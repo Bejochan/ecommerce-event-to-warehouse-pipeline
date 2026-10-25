@@ -1,10 +1,10 @@
 {
   "n_rows": 100000,
   "dataset_size_mb": 0.64,
-  "pandas_time_ms": 70.07,
-  "polars_eager_time_ms": 10.91,
-  "polars_lazy_time_ms": 5.62,
-  "speedup_polars_lazy_vs_pandas": 12.47,
-  "skew_uniform_time_ms": 1.29,
-  "skew_dominated_time_ms": 2.8
+  "pandas_time_ms": 79.17,
+  "polars_eager_time_ms": 28.03,
+  "polars_lazy_time_ms": 18.3,
+  "speedup_polars_lazy_vs_pandas": 4.33,
+  "skew_uniform_time_ms": 1.34,
+  "skew_dominated_time_ms": 2.31
 }
