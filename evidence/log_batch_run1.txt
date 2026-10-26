@@ -1,0 +1,21 @@
+=== LOG EKSEKUSI BATCH INGESTION (Run 1) ===
+Waktu: 2026-10-26T12:10:45+07:00
+Sumber: data/orders.csv (simulasi REST API bertahap)
+Parameter: page_size=25, max_retry=3, backoff_base=1.0s
+Output: data/raw/orders.parquet
+
+[WATERMARK] Tidak ada checkpoint sebelumnya. Memulai penyerapan penuh.
+[INGESTION] Memulai ekstraksi bertahap dari 'data/orders.csv' (page_size=25)...
+  [PAGE 0] Berhasil membaca 25 record (offset 0..25)
+  [PAGE 1] Berhasil membaca 11 record (offset 25..36)
+[WATERMARK] Checkpoint baru diperbarui ke: 2026-09-11T15:00:00+00:00
+
+--- RINGKASAN INGESTION BATCH & WATERMARK ---
+Record dibaca dari sumber (read)     : 36
+Record dilewati watermark (skipped)  : 0
+Record baru ditambahkan (added)      : 36
+Total record unik di Parquet (total) : 36
+File output Parquet                  : data/raw/orders.parquet
+Format penyimpanan                   : Apache Parquet (Snappy compression via PyArrow)
+Status                               : SUKSES (36/36 record tersimpan)
+--------------------------------------------

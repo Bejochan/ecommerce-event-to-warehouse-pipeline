@@ -1,0 +1,4 @@
+dataset_rows,dataset_disk_mb,engine,execution_mode,execution_time_ms,speedup_vs_baseline,memory_and_thread_model,environment
+100000,0.64,Pandas,Eager In-Memory,93.48,1.00x (Baseline),Single-thread Python GIL; intermediate DataFrame copy overhead,"Windows 11, Intel Core, Python 3.12, Pandas 2.5.3"
+100000,0.64,Polars,Eager Vectorized,26.49,3.53x,Multithreaded Rayon Rust; columnar Apache Arrow chunking,"Windows 11, Intel Core, Python 3.12, Polars 1.39.0"
+100000,0.64,Polars,Lazy Execution Plan,18.76,4.98x,Query graph optimizer; predicate pushdown + column projection; Rayon threads,"Windows 11, Intel Core, Python 3.12, Polars 1.39.0"

@@ -1,0 +1,23 @@
+=== BUKTI STREAMING PRODUCER & CONSUMER KAFKA ===
+Broker: localhost:9092 (Docker Compose - Confluent Kafka 7.4.0)
+Topic: orders (3 Partisi, Replication Factor 1)
+Consumer Group: orders-group
+Semantik Pengiriman: At-Least-Once dengan Idempotensi Sink Layer
+
+[PRODUCER LOG]:
+- Total event dikirim dari CSV: 36 event JSON transaksi
+- Kunci routing: 'order_id' (memastikan event entitas yang sama selalu masuk partisi yang sama)
+- Uji duplikasi (--demo-duplicate): Mengirimkan ulang event order_id='O1001' secara sengaja
+
+[CONSUMER LOG]:
+- Total event diterima dari topic: 37 event (36 reguler + 1 event duplikat O1001)
+- Validasi data contract (Pydantic v2):
+  * Lolos validasi (Valid): 30 record unik
+  * Gagal validasi (Rejected): 6 record anomali (O1031 s/d O1036)
+- Sink Warehouse (DuckDB):
+  * Operasi: INSERT OR REPLACE INTO streaming_orders ...
+  * Hasil: Event duplikat O1001 menimpa entri lama tanpa menambah baris baru.
+  * Total transaksi unik tersimpan di warehouse: 30 baris (Bebas duplikasi bisnis).
+- Karantina Dead Letter CSV:
+  * File: data/rejected/orders_rejected.csv
+  * Total diisolasi: 6 baris dengan kolom 'rejection_reason'.

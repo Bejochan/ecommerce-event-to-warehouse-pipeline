@@ -1,0 +1,44 @@
+05:13:24  Running with dbt=1.12.6
+05:13:25  Registered adapter: duckdb=1.11.0
+05:13:29  Found 5 models, 16 data tests, 500 macros
+05:13:29  
+05:13:29  Concurrency: 1 threads (target='dev')
+05:13:29  
+05:13:35  1 of 16 START test not_null_dim_customer_customer_id ........................... [RUN]
+05:13:35  1 of 16 PASS not_null_dim_customer_customer_id ................................. [PASS in 0.05s]
+05:13:35  2 of 16 START test not_null_dim_product_category_product_category .............. [RUN]
+05:13:35  2 of 16 PASS not_null_dim_product_category_product_category .................... [PASS in 0.02s]
+05:13:35  3 of 16 START test not_null_fct_orders_customer_id ............................. [RUN]
+05:13:35  3 of 16 PASS not_null_fct_orders_customer_id ................................... [PASS in 0.02s]
+05:13:35  4 of 16 START test not_null_fct_orders_order_id ................................ [RUN]
+05:13:35  4 of 16 PASS not_null_fct_orders_order_id ...................................... [PASS in 0.02s]
+05:13:35  5 of 16 START test not_null_fct_orders_product_category ........................ [RUN]
+05:13:36  5 of 16 PASS not_null_fct_orders_product_category .............................. [PASS in 0.01s]
+05:13:36  6 of 16 START test not_null_mart_daily_sales_net_sales ......................... [RUN]
+05:13:36  6 of 16 PASS not_null_mart_daily_sales_net_sales ............................... [PASS in 0.02s]
+05:13:36  7 of 16 START test not_null_mart_daily_sales_order_date ........................ [RUN]
+05:13:36  7 of 16 PASS not_null_mart_daily_sales_order_date .............................. [PASS in 0.02s]
+05:13:36  8 of 16 START test not_null_stg_orders_customer_id ............................. [RUN]
+05:13:36  8 of 16 PASS not_null_stg_orders_customer_id ................................... [PASS in 0.02s]
+05:13:36  9 of 16 START test not_null_stg_orders_net_sales ............................... [RUN]
+05:13:36  9 of 16 PASS not_null_stg_orders_net_sales ..................................... [PASS in 0.02s]
+05:13:36  10 of 16 START test not_null_stg_orders_order_id ............................... [RUN]
+05:13:36  10 of 16 PASS not_null_stg_orders_order_id ..................................... [PASS in 0.02s]
+05:13:36  11 of 16 START test relationships_fct_orders_customer_id__customer_id__ref_dim_customer_  [RUN]
+05:13:36  11 of 16 PASS relationships_fct_orders_customer_id__customer_id__ref_dim_customer_  [PASS in 0.03s]
+05:13:36  12 of 16 START test relationships_fct_orders_product_category__product_category__ref_dim_product_category_  [RUN]
+05:13:36  12 of 16 PASS relationships_fct_orders_product_category__product_category__ref_dim_product_category_  [PASS in 0.02s]
+05:13:36  13 of 16 START test unique_dim_customer_customer_id ............................ [RUN]
+05:13:36  13 of 16 PASS unique_dim_customer_customer_id .................................. [PASS in 0.02s]
+05:13:36  14 of 16 START test unique_dim_product_category_product_category ............... [RUN]
+05:13:36  14 of 16 PASS unique_dim_product_category_product_category ..................... [PASS in 0.02s]
+05:13:36  15 of 16 START test unique_fct_orders_order_id ................................. [RUN]
+05:13:36  15 of 16 PASS unique_fct_orders_order_id ....................................... [PASS in 0.02s]
+05:13:36  16 of 16 START test unique_stg_orders_order_id ................................. [RUN]
+05:13:36  16 of 16 PASS unique_stg_orders_order_id ....................................... [PASS in 0.02s]
+05:13:36  
+05:13:36  Finished running 16 data tests in 0 hours 0 minutes and 6.50 seconds (6.50s).
+05:13:36  
+05:13:36  Completed successfully
+05:13:36  
+05:13:36  Done. PASS=16 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=16

@@ -1,0 +1,22 @@
+=== BUKTI WATERMARK INCREMENTAL & IDEMPOTENSI (Run 1 vs Run 2) ===
+
+[EKSEKUSI PERTAMA - Run 1]:
+- Waktu: 2026-10-26T12:10:45+07:00
+- Checkpoint awal: None
+- Record dibaca: 36
+- Record dilewati: 0
+- Record ditambahkan: 36
+- Total di Parquet: 36
+- Checkpoint tersimpan: 2026-09-11T15:00:00+00:00
+
+[EKSEKUSI KEDUA - Run 2 (Pengujian Idempotensi)]:
+- Waktu: 2026-10-26T12:10:46+07:00
+- Checkpoint terbaca: 2026-09-11T15:00:00+00:00
+- Record dibaca dari sumber: 36
+- Record dilewati oleh watermark: 36
+- Record baru ditambahkan: 0
+- Total record di Parquet: 36 (TIDAK BERUBAH)
+
+KESIMPULAN AUDIT:
+1. State watermark pada file 'data/raw/.watermark' secara deterministik mencegah duplikasi data historis.
+2. Pipeline bersifat idempoten: eksekusi ulang tidak menimbulkan efek ganda pada storage lake maupun warehouse.
